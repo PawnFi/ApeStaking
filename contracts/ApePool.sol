@@ -405,6 +405,7 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
          *  accountTokensNew = accountTokens[minter] + mintTokens
          * And write them into storage
          */
+        emit Mint(minter, actualMintAmount, mintTokens);
         _mint(minter, mintTokens);
 
         _invest();

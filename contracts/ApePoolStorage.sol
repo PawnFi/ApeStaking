@@ -91,6 +91,11 @@ abstract contract ApePoolStorage {
     event AccrueInterest(uint cashPrior, uint interestAccumulated, uint borrowIndex, uint totalBorrows);
 
     /**
+     * @notice Event emitted when tokens are minted
+     */
+    event Mint(address minter, uint mintAmount, uint mintTokens);
+    
+    /**
      * @notice Event emitted when tokens are redeemed
      */
     event Redeem(address redeemer, uint redeemAmount, uint redeemTokens);
