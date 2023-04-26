@@ -145,4 +145,6 @@ abstract contract ApeStakingStorage {
     event StakePairNft(address userAddr, address nftAsset, uint256 mainTokenId, uint256 bakcTokenId, uint256 amount);
     event UnstakePairNft(address userAddr, address nftAsset, uint256 mainTokenId, uint256 bakcTokenId, uint256 amount, uint256 rewardAmount);
     event ClaimPairNft(address userAddr, address nftAsset, uint256 mainTokenId, uint256 bakcTokenId, uint256 rewardAmount);
+    
+    event SetCollectRate(address userAddr, uint256 collectRate);
  }

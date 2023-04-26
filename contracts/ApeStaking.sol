@@ -742,6 +742,7 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
     function setCollectRate(uint256 newCollectRate) external {
         require(newCollectRate <= BASE_PERCENTS, "rate err");
         _userInfo[msg.sender].collectRate = newCollectRate;
+        emit SetCollectRate(msg.sender, newCollectRate);
     }
 
     /**
