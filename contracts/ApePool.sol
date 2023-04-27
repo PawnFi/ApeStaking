@@ -103,7 +103,7 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
 
     function getRewardRatePerBlock() public view returns (uint256) {
         ( , uint256 lastRewardsRangeIndex, uint256 stakedAmount, ) = IApeCoinStaking(apeCoinStaking).pools(0);
-        stakedAmount == 0 ? 1 : stakedAmount;
+        stakedAmount = stakedAmount == 0 ? 1 : stakedAmount;
         IApeCoinStaking.TimeRange memory timeRange = IApeCoinStaking(apeCoinStaking).getTimeRangeBy(0, lastRewardsRangeIndex);
         return (uint256(timeRange.rewardsPerHour) * 24 * 365 * expScale) / (stakedAmount * 2102400);
     }
