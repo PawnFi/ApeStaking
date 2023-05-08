@@ -113,7 +113,7 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
      * @return The borrow interest rate per block, scaled by 1e18
      */
     function borrowRatePerBlock() external view returns (uint) {
-        return interestRateModel.getBorrowRate(getCashPrior(), totalBorrows, 0) + getRewardRatePerBlock();
+        return interestRateModel.getBorrowRate(getCashPrior(), totalBorrows, 0, getRewardRatePerBlock());
     }
 
     /**
@@ -121,7 +121,7 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
      * @return The supply interest rate per block, scaled by 1e18
      */
     function supplyRatePerBlock() external view returns (uint) {
-        return interestRateModel.getSupplyRate(getCashPrior(), totalBorrows, 0, reserveFactorMantissa) + getRewardRatePerBlock();
+        return interestRateModel.getSupplyRate(getCashPrior(), totalBorrows, 0, reserveFactorMantissa, getRewardRatePerBlock());
     }
 
     /**
@@ -249,7 +249,7 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
         uint borrowIndexPrior = borrowIndex;
 
         /* Calculate the current borrow interest rate */
-        uint borrowRateMantissa = interestRateModel.getBorrowRate(cashPrior, borrowsPrior, reservesPrior) + getRewardRatePerBlock();
+        uint borrowRateMantissa = interestRateModel.getBorrowRate(cashPrior, borrowsPrior, reservesPrior, getRewardRatePerBlock());
 
         /* Calculate the number of blocks elapsed since the last accrual */
         uint blockDelta = currentBlockNumber - accrualBlockNumberPrior;

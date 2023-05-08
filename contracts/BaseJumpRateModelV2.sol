@@ -93,16 +93,17 @@ abstract contract BaseJumpRateModelV2 is InterestRateModel {
      * @param reserves The amount of reserves in the market
      * @return The borrow rate percentage per block as a mantissa (scaled by BASE)
      */
-    function getBorrowRateInternal(uint cash, uint borrows, uint reserves) internal view returns (uint) {
+    function getBorrowRateInternal(uint cash, uint borrows, uint reserves, uint rewardRatePerBlock) internal view returns (uint) {
         uint util = utilizationRate(cash, borrows, reserves);
-
+        uint borrowRatePerBlock;
         if (util <= kink) {
-            return ((util * multiplierPerBlock) / BASE) + baseRatePerBlock;
+            borrowRatePerBlock = ((util * multiplierPerBlock) / BASE) + baseRatePerBlock;
         } else {
             uint normalRate = ((kink * multiplierPerBlock) / BASE) + baseRatePerBlock;
             uint excessUtil = util - kink;
-            return ((excessUtil * jumpMultiplierPerBlock) / BASE) + normalRate;
+            borrowRatePerBlock = ((excessUtil * jumpMultiplierPerBlock) / BASE) + normalRate;
         }
+        return borrowRatePerBlock + rewardRatePerBlock;
     }
 
     /**
@@ -113,9 +114,9 @@ abstract contract BaseJumpRateModelV2 is InterestRateModel {
      * @param reserveFactorMantissa The current reserve factor for the market
      * @return The supply rate percentage per block as a mantissa (scaled by BASE)
      */
-    function getSupplyRate(uint cash, uint borrows, uint reserves, uint reserveFactorMantissa) virtual override public view returns (uint) {
+    function getSupplyRate(uint cash, uint borrows, uint reserves, uint reserveFactorMantissa, uint rewardRatePerBlock) virtual override public view returns (uint) {
         uint oneMinusReserveFactor = BASE - reserveFactorMantissa;
-        uint borrowRate = getBorrowRateInternal(cash, borrows, reserves);
+        uint borrowRate = getBorrowRateInternal(cash, borrows, reserves, rewardRatePerBlock);
         uint rateToPool = borrowRate * oneMinusReserveFactor / BASE;
         return utilizationRate(cash, borrows, reserves) * rateToPool / BASE;
     }
