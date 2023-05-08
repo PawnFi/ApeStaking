@@ -599,12 +599,12 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
         uint256 totalIncome;
         uint256 totalPay;
         (totalIncome, totalPay) = getUserHealth(userAddr);
-        require(totalIncome < totalPay * stakingConfiguration.liquidateRate / BASE_PERCENTS, "income less");
+        require(totalIncome * BASE_PERCENTS < totalPay * stakingConfiguration.liquidateRate, "income less");
         for(uint256 i = 0; i < nftAssets.length; i++) {
             require(userAddr == _nftInfo[nftAssets[i]].staker[nftIds[i]], "owner err");
             _onStopStake(nftAssets[i], nftIds[i], RewardAction.STOPSTAKE);
             (totalIncome, totalPay) = getUserHealth(userAddr);
-            if(totalIncome >= totalPay * stakingConfiguration.borrowSafeRate / BASE_PERCENTS) {
+            if(totalIncome * BASE_PERCENTS >= totalPay * stakingConfiguration.borrowSafeRate) {
                 _transferAsset(pawnToken, msg.sender, stakingConfiguration.liquidatePawnAmount);           
                 break;
             }
