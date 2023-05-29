@@ -163,6 +163,7 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
      * @return address Agency address of staking
      */
     function _getPTokenStaking(address nftAsset) internal view returns (address) {
+        require(nftAsset == BAYC_ADDR || nftAsset == MAYC_ADDR);
         return nftAsset == BAYC_ADDR ? pbaycAddr : pmaycAddr;
     }
 
@@ -175,7 +176,6 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
      */
     function _delUserDepositInfo(address userAddr, address nftAsset, uint256 nftId) internal returns (uint256 iTokenAmount){
         NftInfo storage nftInfo = _nftInfo[nftAsset];
-        require(userAddr == nftInfo.depositor[nftId], "depositor err");
         iTokenAmount = nftInfo.iTokenAmount[nftId];
         delete nftInfo.depositor[nftId];
         delete nftInfo.iTokenAmount[nftId];
@@ -199,7 +199,7 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
         ITokenLending(iTokenAddr).redeem(iTokenAmount);
         uint balanceAfter = IERC20Upgradeable(pTokenAddr).balanceOf(address(this));
         uint256 redeemAmount = balanceAfter - balanceBefore;
-        require(redeemAmount >= pieceCount, "redeem less");
+        require(redeemAmount >= pieceCount,"less");
 
         uint256[] memory tokenIds = new uint256[](1);
         tokenIds[0] = nftId;
@@ -285,7 +285,7 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
         uint256 nftPairAmount = 0;
         for (uint256 index = 0; index < _nftPairs.length; index++) {
             tokenId = _nftPairs[index].bakcTokenId;
-            require(_validOwner(userAddr, ptokenStaking, nftAsset, _nftPairs[index].mainTokenId), "main err");
+            require(_validOwner(userAddr, ptokenStaking, nftAsset, _nftPairs[index].mainTokenId),"main");
             _store(userAddr, pbakcAddr, BAKC_ADDR, tokenId);
             amount =_nftPairs[index].amount;
             nftPairAmount += amount;
@@ -296,12 +296,19 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
     }
 
     function _store(address userAddr, address ptokenStaking, address nftAsset, uint256 nftId) internal {
-        require(_validOwner(userAddr, ptokenStaking, nftAsset, nftId), "Owner err");
+        require(_validOwner(userAddr, ptokenStaking, nftAsset, nftId),"owner");
         NftInfo storage nftInfo = _nftInfo[nftAsset];
-        UserInfo storage userInfo = _userInfo[userAddr];
-        nftInfo.staker[nftId] = userAddr;
-        nftInfo.stakeIds.add(nftId);
-        userInfo.stakeIds[nftInfo.poolId].add(nftId);
+        
+        if(nftInfo.staker[nftId] == address(0)) {
+            nftInfo.staker[nftId] = userAddr;
+            nftInfo.stakeIds.add(nftId);
+
+            UserInfo storage userInfo = _userInfo[userAddr];
+            userInfo.stakeIds[nftInfo.poolId].add(nftId);
+
+            (uint256 stakingAmount, ) = IApeCoinStaking(apeCoinStaking).nftPosition(nftInfo.poolId, nftId);
+            userInfo.stakeAmount[nftInfo.poolId] += stakingAmount;
+        }
     }
 
     /**
@@ -324,7 +331,7 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
         if(stakingInfo.borrowAmount > 0) {
             uint256 borrowRate = IApePool(apePool).borrowRatePerBlock();
             uint256 stakingRate = getRewardRatePerBlock(_nftInfo[stakingInfo.nftAsset].poolId, stakingInfo.borrowAmount);
-            require(borrowRate + stakingConfiguration.addMinStakingRate < stakingRate, "stakingRate low");
+            require(borrowRate + stakingConfiguration.addMinStakingRate < stakingRate,"rate");
             IApePool(apePool).borrowBehalf(userAddr, stakingInfo.borrowAmount);
             IERC20Upgradeable(apeCoin).safeTransfer(ptokenStaking, stakingInfo.borrowAmount);
         }
@@ -387,7 +394,7 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
      */
     function _validStaker(address userAddr, address ptokenStaking, address nftAsset, uint256 nftId, RewardAction actionType) internal view returns (RewardAction) {
         address staker = _nftInfo[nftAsset].staker[nftId];
-        require(staker == userAddr,"not staker");
+        require(staker == userAddr,"staker");
         if(!_validOwner(userAddr, ptokenStaking, nftAsset, nftId) && actionType == RewardAction.WITHDRAW){
             return RewardAction.REDEEM;
         }
@@ -399,18 +406,19 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
         uint256 poolId = nftInfo.poolId;
         ( , uint256 stakingAmount, uint256 claimAmount) = getStakeInfo(poolId, nftId);
         withdrawAmount = maximum ? stakingAmount : withdrawAmount;
-        require(stakingAmount >= withdrawAmount, "not stake");
+        require(stakingAmount >= withdrawAmount,"more");
 
+        UserInfo storage userInfo = _userInfo[nftInfo.staker[nftId]];
         if(withdrawAmount == stakingAmount) {
-            UserInfo storage userInfo = _userInfo[nftInfo.staker[nftId]];
-
+            
             delete nftInfo.staker[nftId];
             nftInfo.stakeIds.remove(nftId);
             userInfo.stakeIds[poolId].remove(nftId);
-            userInfo.stakeAmount[poolId] -= stakingAmount;
+            
         } else {
             claimAmount = 0;
         }
+        userInfo.stakeAmount[poolId] -= withdrawAmount;
         return (withdrawAmount, claimAmount);
     }
 
@@ -465,9 +473,9 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
     }
 
     function _claimVerify(address userAddr, address ptokenStaking, address nftAsset, uint256 nftId) internal view returns (uint256 claimAmount) {
-        require(_validOwner(userAddr, ptokenStaking, nftAsset, nftId), "Owner err");
+        require(_validOwner(userAddr, ptokenStaking, nftAsset, nftId),"owner");
         ( , , claimAmount) = getStakeInfo(_nftInfo[nftAsset].poolId, nftId);
-        require(claimAmount > 0, "claim failed");
+        require(claimAmount > 0,"claim");
     }
 
     function _claimApeCoin(
@@ -491,7 +499,7 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
         }
 
         for (uint256 index = 0; index < _nftPairs.length; index++) {
-            require(_validOwner(userAddr, ptokenStaking, nftAsset, _nftPairs[index].mainTokenId), "main err");
+            require(_validOwner(userAddr, ptokenStaking, nftAsset, _nftPairs[index].mainTokenId),"main");
             tokenId = _nftPairs[index].bakcTokenId;
             claimAmount = _claimVerify(userAddr, pbakcAddr, BAKC_ADDR, tokenId);
             totalClaimAmount += claimAmount;
@@ -533,7 +541,6 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
                 repayed -= allAmount;
                 allAmount = 0;
                 if(allClaimAmount < repayed) {
-                    repayed -= allClaimAmount;
                     allClaimAmount = 0;
                 } else {
                     allClaimAmount -= repayed;
@@ -583,7 +590,7 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
         IApeCoinStaking.PairNft[] calldata baycPairNfts,
         IApeCoinStaking.PairNft[] calldata maycPairNfts
     ) external nonReentrant {
-        require(msg.sender == userAddr || hasRole(REINVEST_ROLE, msg.sender), "No role");
+        require(msg.sender == userAddr || hasRole(REINVEST_ROLE, msg.sender));
         _claimApeCoin(userAddr, BAYC_ADDR, baycNfts, baycPairNfts, RewardAction.RESTAKE);
         _claimApeCoin(userAddr, MAYC_ADDR, maycNfts, maycPairNfts, RewardAction.RESTAKE);
     }
@@ -595,13 +602,13 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
      * @param nftIds nft ids
      */
     function unstakeAndRepay(address userAddr, address[] calldata nftAssets, uint256[] calldata nftIds) external nonReentrant {
-        require(nftAssets.length == nftIds.length, "size err");
+        require(nftAssets.length == nftIds.length);
         uint256 totalIncome;
         uint256 totalPay;
         (totalIncome, totalPay) = getUserHealth(userAddr);
-        require(totalIncome * BASE_PERCENTS < totalPay * stakingConfiguration.liquidateRate, "income less");
+        require(totalIncome * BASE_PERCENTS < totalPay * stakingConfiguration.liquidateRate,"income");
         for(uint256 i = 0; i < nftAssets.length; i++) {
-            require(userAddr == _nftInfo[nftAssets[i]].staker[nftIds[i]], "owner err");
+            require(userAddr == _nftInfo[nftAssets[i]].staker[nftIds[i]],"staker");
             _onStopStake(nftAssets[i], nftIds[i], RewardAction.STOPSTAKE);
             (totalIncome, totalPay) = getUserHealth(userAddr);
             if(totalIncome * BASE_PERCENTS >= totalPay * stakingConfiguration.borrowSafeRate) {
@@ -643,17 +650,15 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
      */
     function _withdraw(address userAddr, address nftAsset, uint256 nftId, bool paired) internal {
         NftInfo storage nftInfo = _nftInfo[nftAsset];
-        address depositor = nftInfo.depositor[nftId];
-        require(userAddr == depositor, "owner err");
-        ( , uint256 stakingAmount, ) = getStakeInfo(nftInfo.poolId, nftId);
-        require(stakingAmount == 0, "staking now");
-        bool isPaired;
+        require(userAddr == nftInfo.depositor[nftId],"depositor");
+        require(nftInfo.staker[nftId] == address(0),"staker");
+
         if(!paired) {
-            (, isPaired) = IApeCoinStaking(apeCoinStaking).mainToBakc(nftInfo.poolId, nftId);
-        } else {
-            (, isPaired) = IApeCoinStaking(apeCoinStaking).bakcToMain(nftId, nftInfo.poolId);
+            (uint256 tokenId,bool isPaired) = IApeCoinStaking(apeCoinStaking).mainToBakc(nftInfo.poolId, nftId);
+            if(isPaired){
+                require(_nftInfo[BAKC_ADDR].staker[tokenId] == address(0),"pair");
+            }
         }
-        require(!isPaired, "pairing now");
         _withdrawNftFromLending(userAddr, nftAsset, nftId);
     }
 
@@ -665,7 +670,7 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
      * @param actionType Event type
      */
     function onStopStake(address caller, address nftAsset, uint256[] calldata nftIds, RewardAction actionType) external{
-        require(msg.sender == pbaycAddr || msg.sender == pmaycAddr || msg.sender == pbakcAddr, "caller err");
+        require(msg.sender == pbaycAddr || msg.sender == pmaycAddr || msg.sender == pbakcAddr);
         if(caller != address(this)) {
             for(uint i = 0; i < nftIds.length; i++) {
                 _onStopStake(nftAsset, nftIds[i], actionType);
@@ -691,13 +696,14 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
         IApeCoinStaking.SingleNft[] memory _nfts;
         PairVars memory pairVars;
 
+        address userAddr = nftInfo.staker[nftId];
         if(nftAsset == BAYC_ADDR || nftAsset == MAYC_ADDR) {
             pairVars.nftAsset = nftAsset;
             pairVars.mainTokenId = nftId;
             ( , uint256 stakingAmount, ) = getStakeInfo(nftInfo.poolId, nftId);
             (pairVars.bakcTokenId, pairVars.isPaired) = IApeCoinStaking(apeCoinStaking).mainToBakc(nftInfo.poolId, nftId);
             
-            if(stakingAmount > 0) {
+            if(stakingAmount > 0 && userAddr != address(0)) {
                 _nfts = new IApeCoinStaking.SingleNft[](1);
                 _nfts[0] = IApeCoinStaking.SingleNft({
                     tokenId: uint32(nftId),
@@ -713,15 +719,16 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
                 (pairVars.mainTokenId, pairVars.isPaired) = IApeCoinStaking(apeCoinStaking).bakcToMain(nftId, _nftInfo[pairVars.nftAsset].poolId);
             }
         }
-        address userAddr = nftInfo.staker[nftId] != address(0) ? nftInfo.staker[nftId] : _nftInfo[BAKC_ADDR].staker[pairVars.bakcTokenId];
+        
         _onStopStakePairNft(userAddr, pairVars, _nfts, actionType);
     }
 
-    function _onStopStakePairNft(address userAddr, PairVars memory pairVars, IApeCoinStaking.SingleNft[] memory _nfts, RewardAction actionType) internal {
+    function _onStopStakePairNft(address mainUserAddr, PairVars memory pairVars, IApeCoinStaking.SingleNft[] memory _nfts, RewardAction actionType) internal {
         IApeCoinStaking.PairNftWithdrawWithAmount[] memory _nftPairs;
+        address bakcUserAddr = _nftInfo[BAKC_ADDR].staker[pairVars.bakcTokenId];
         if(pairVars.isPaired) {
             ( , uint256 stakingAmount, ) = getStakeInfo(_nftInfo[BAKC_ADDR].poolId, pairVars.bakcTokenId);
-            if(stakingAmount > 0) {
+            if(stakingAmount > 0 && bakcUserAddr != address(0)) {
                 _nftPairs = new IApeCoinStaking.PairNftWithdrawWithAmount[](1);
                 _nftPairs[0] = IApeCoinStaking.PairNftWithdrawWithAmount({
                     mainTokenId: uint32(pairVars.mainTokenId),
@@ -732,7 +739,10 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
             }
             
         }
-        _withdrawApeCoin(userAddr, pairVars.nftAsset, _nfts, _nftPairs, actionType);
+        if(_nfts.length > 0 || _nftPairs.length > 0) {
+            address userAddr = mainUserAddr != address(0) ? mainUserAddr : bakcUserAddr;
+            _withdrawApeCoin(userAddr, pairVars.nftAsset, _nfts, _nftPairs, actionType);
+        }
     }
 
     /**
@@ -740,7 +750,7 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
      * @param newCollectRate Collect rate
      */
     function setCollectRate(uint256 newCollectRate) external {
-        require(newCollectRate <= BASE_PERCENTS, "rate err");
+        require(newCollectRate <= BASE_PERCENTS);
         _userInfo[msg.sender].collectRate = newCollectRate;
         emit SetCollectRate(msg.sender, newCollectRate);
     }
