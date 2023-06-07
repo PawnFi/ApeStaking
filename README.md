@@ -8,7 +8,7 @@ The ApeStaking contract streamlines the staking process for Pawnfi users, enabli
 
 ## Audits
 
-- PeckShield ( - ) : [report](./audits/audits.pdf) (Also available in Chinese in the same folder)
+- PeckShield: [report](./audits/PeckShield-Audit-Report-PawnFi-ApeStaking-v1.2.pdf) (Also available in Chinese in the same folder)
 
 ## Contracts
 
