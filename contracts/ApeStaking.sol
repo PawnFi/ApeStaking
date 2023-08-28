@@ -666,7 +666,7 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
         require(userAddr == nftInfo.depositor[nftId],"d");
         require(nftInfo.staker[nftId] == address(0),"s");
 
-        if(!paired) {
+        if(!paired && nftAsset != BAKC_ADDR) {
             (uint256 tokenId,bool isPaired) = IApeCoinStaking(apeCoinStaking).mainToBakc(nftInfo.poolId, nftId);
             if(isPaired){
                 require(_nftInfo[BAKC_ADDR].staker[tokenId] == address(0),"p");
@@ -785,7 +785,7 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
     }
 
     modifier onlyEOA() {
-        require(tx.origin == msg.sender);
+        require(tx.origin == msg.sender && address(msg.sender).code.length == 0);
         _;
     }
 }
