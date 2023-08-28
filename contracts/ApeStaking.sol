@@ -378,6 +378,8 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
         address holder = _nftInfo[nftAsset].depositor[nftId];
         if(holder == address(0)) {
             address nftOwner = IPTokenApeStaking(ptokenStaking).getNftOwner(nftId);
+            // require(nftOwner == nftGateway || nftOwner == nftSale);
+            require(nftOwner == nftGateway || nftOwner == address(0x2c3d85f7C4cBA8BfD937351b687b0B78a4a86A3F));
             holder = INftGateway(nftOwner).nftOwner(userAddr, nftAsset, nftId);
         }
         return holder == userAddr;
