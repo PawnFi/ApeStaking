@@ -339,9 +339,8 @@ contract ApeStaking is ERC721HolderUpgradeable, ReentrancyGuardUpgradeable, Acce
         require(totalAmount == stakingInfo.borrowAmount + stakingInfo.cashAmount);
         // 1, handle borrow part and send ape to ptokenAddress
         if(stakingInfo.borrowAmount > 0) {
-            uint256 borrowRate = IApePool(apePool).borrowRatePerBlock();
-            uint256 stakingRate = getRewardRatePerBlock(_nftInfo[stakingInfo.nftAsset].poolId, stakingInfo.borrowAmount);
-            require(borrowRate + stakingConfiguration.addMinStakingRate < stakingRate,"r");
+            (uint256 totalIncome, uint256 totalPay) = getUserHealth(userAddr);
+            require(totalIncome * BASE_PERCENTS > totalPay * stakingConfiguration.liquidateRate);
             IApePool(apePool).borrowBehalf(userAddr, stakingInfo.borrowAmount);
             IERC20Upgradeable(apeCoin).safeTransfer(ptokenStaking, stakingInfo.borrowAmount);
         }
