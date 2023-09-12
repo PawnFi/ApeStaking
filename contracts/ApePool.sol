@@ -341,7 +341,8 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
      * @param mintAmount The amount of the underlying asset to supply
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
-    function mint(uint mintAmount) external nonReentrant returns (uint) {
+    function mint(uint mintAmount) external nonReentrant onlyEOA returns (uint) {
+        require(mintAmount > 0);
         accrueInterest();
         // mintFresh emits the actual Mint event if successful and logs on errors, so we don't need to
         mintFresh(msg.sender, msg.sender, mintAmount);
@@ -356,6 +357,8 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function mintBehalf(address minter, uint mintAmount) external nonReentrant returns (uint) {
+        require(mintAmount > 0);
+        require(msg.sender == apeStaking, "Caller is not stakeDelegate address");
         accrueInterest();
         // mintFresh emits the actual Mint event if successful and logs on errors, so we don't need to
         mintFresh(msg.sender, minter, mintAmount);
@@ -417,7 +420,8 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
      * @param redeemTokens The number of cTokens to redeem into underlying
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
-    function redeem(uint redeemTokens) external nonReentrant returns (uint) {
+    function redeem(uint redeemTokens) external nonReentrant onlyEOA returns (uint) {
+        require(redeemTokens > 0);
         accrueInterest();
         // redeemFresh emits redeem-specific logs on errors, so we don't need to
         redeemFresh(payable(msg.sender), redeemTokens, 0);
@@ -430,7 +434,8 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
      * @param redeemAmount The amount of underlying to redeem
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
-    function redeemUnderlying(uint redeemAmount) external nonReentrant returns (uint) {
+    function redeemUnderlying(uint redeemAmount) external nonReentrant onlyEOA returns (uint) {
+        require(redeemAmount > 0);
         accrueInterest();
         // redeemFresh emits redeem-specific logs on errors, so we don't need to
         redeemFresh(msg.sender, 0, redeemAmount);
@@ -532,6 +537,7 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
       * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
       */
     function borrowBehalf(address borrower, uint borrowAmount) external nonReentrant returns (uint) {
+        require(borrowAmount > 0);
         require(msg.sender == apeStaking, "Caller is not stakeDelegate address");
         accrueInterest();
         // borrowFresh emits borrow-specific logs on errors, so we don't need to
@@ -593,7 +599,8 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
      * @param repayAmount The amount to repay, or -1 for the full outstanding amount
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
-    function repayBorrow(uint repayAmount) external nonReentrant returns (uint) {
+    function repayBorrow(uint repayAmount) external nonReentrant onlyEOA returns (uint) {
+        require(repayAmount > 0);
         accrueInterest();
         // repayBorrowFresh emits repay-borrow-specific logs on errors, so we don't need to
         repayBorrowFresh(msg.sender, msg.sender, repayAmount);
@@ -607,6 +614,8 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function repayBorrowBehalf(address borrower, uint repayAmount) external nonReentrant returns (uint) {
+        require(repayAmount > 0);
+        require(msg.sender == apeStaking, "Caller is not stakeDelegate address");
         accrueInterest();
         // repayBorrowFresh emits repay-borrow-specific logs on errors, so we don't need to
         repayBorrowFresh(msg.sender, borrower, repayAmount);
@@ -846,4 +855,9 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
         _;
         _notEntered = true; // get a gas-refund post-Istanbul
     }  
+
+    modifier onlyEOA() {
+        require(tx.origin == msg.sender && address(msg.sender).code.length == 0, "Only EOA");
+        _;
+    }
 }
