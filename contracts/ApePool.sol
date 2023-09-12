@@ -857,7 +857,7 @@ contract ApePool is ExponentialNoError, TokenErrorReporter, AccessControlUpgrade
     }  
 
     modifier onlyEOA() {
-        require(tx.origin == msg.sender, "Only EOA");
+        require(tx.origin == msg.sender && address(msg.sender).code.length == 0, "Only EOA");
         _;
     }
 }
